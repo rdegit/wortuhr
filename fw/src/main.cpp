@@ -10,6 +10,7 @@
 #include "Ota.h"
 #include "Persistent.h"
 #include "Time.h"
+#include "Brightness.h"
 #include "html_cfg.h"
 #include "html_wifi_cfg.h"
 
@@ -23,6 +24,7 @@ Ota ota;
 TimeGetter timeGetter;
 AsyncWebServer server(80);
 Persistent persistent;
+Brightness brightness;
 
 bool factoryReset = false;
 
@@ -102,6 +104,7 @@ void setupForNormal(void) {
 
   ota.setup();
   timeGetter.setup();
+  brightness.setup(persistent.dim().base, persistent.dim().scale);
 
   // Serving the standard configuration page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -201,6 +204,7 @@ void setupForNormal(void) {
           d.scale = jsonObj["dimScale"];
         }
         persistent.dim(d);
+        brightness.setScaleParams(d.base, d.scale);
         persistent.print();
 
         persistent.updateToFlash();
@@ -298,6 +302,11 @@ void loop() {
       int h;
       int m;
       timeGetter.getTime(h, m);
+
+      if(persistent.dim().active) {
+        uint8_t luma = brightness.getLuma();
+        ledCtrl.setLuma(luma);
+      }
 
       h += persistent.timeZoneOffset() + (persistent.dayLightSaving()?1:0);
       if (withinActiveTimeWindow(h, m)) ledCtrl.setClock(h, m);
